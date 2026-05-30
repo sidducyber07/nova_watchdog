@@ -1,0 +1,103 @@
+openapi: 3.0.3
+info:
+  title: Nova Watchdog API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Created
+  /auth/login:
+    post:
+      summary: Login and receive JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: OK
+  /monitors:
+    get:
+      summary: List monitors for current user
+      responses:
+        '200':
+          description: list
+    post:
+      summary: Create monitor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MonitorCreate'
+      responses:
+        '201':
+          description: created
+  /monitors/{id}:
+    get:
+      summary: Get monitor
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Update monitor
+    delete:
+      summary: Delete monitor
+  /monitors/{id}/run:
+    post:
+      summary: Trigger immediate check
+  /snapshots:
+    get:
+      summary: List snapshots
+  /snapshots/{id}:
+    get:
+      summary: Get snapshot details (includes screenshot URL)
+  /alerts:
+    get:
+      summary: List alerts
+components:
+  schemas:
+    MonitorCreate:
+      type: object
+      required: [name, url]
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        selector:
+          type: string
+        frequency_seconds:
+          type: integer
+        mode:
+          type: string
+          enum: [rendered, raw, pdf]

@@ -1,0 +1,95 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: nova
+      POSTGRES_PASSWORD: nova
+      POSTGRES_DB: nova_watchdog
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data
+    ports:
+      - '9000:9000'
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - postgres
+      - minio
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nova:nova@postgres:5432/nova_watchdog
+      REDIS_URL: redis://redis:6379/0
+      SNAPSHOT_DIR: /data/snapshots
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_SECURE: "false"
+      MINIO_BUCKET_HTML: snapshots-html
+      MINIO_BUCKET_IMAGES: snapshots-images
+      MINIO_BUCKET_EXPORTS: exports
+    volumes:
+      - ./data/snapshots:/data/snapshots
+    ports:
+      - '8000:8000'
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    depends_on:
+      - redis
+      - postgres
+      - minio
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nova:nova@postgres:5432/nova_watchdog
+      REDIS_URL: redis://redis:6379/0
+      SNAPSHOT_DIR: /data/snapshots
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_SECURE: "false"
+      MINIO_BUCKET_HTML: snapshots-html
+      MINIO_BUCKET_IMAGES: snapshots-images
+      MINIO_BUCKET_EXPORTS: exports
+    volumes:
+      - ./data/snapshots:/data/snapshots
+
+  beat:
+    image: celery
+    command: celery -A app.celery_app.app beat --loglevel=info
+    depends_on:
+      - redis
+      - postgres
+
+  flower:
+    image: mher/flower
+    command: flower --broker=redis://redis:6379/0 --port=5555
+    ports:
+      - '5555:5555'
+
+volumes:
+  pgdata:
